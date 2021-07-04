@@ -2,7 +2,7 @@
 #define EFFECTFILESYSTEM_H
 
 #include <Arduino.h>
-#include "FS.h"
+//#include "FS.h"
 #include <LittleFS.h>
 
 /* You only need to format LITTLEFS the first time you run a
@@ -16,7 +16,7 @@ int getFilesInDirectory(String* file_array, String directory) {
   //String* file_list;
   Serial.printf("Listing directory: %s\r\n", directory.c_str());
 
-  File root = LittleFS.open(directory.c_str());
+  File root = LittleFS.open(directory.c_str(), "r");
   if (!root) {
     Serial.println("- failed to open directory");
     return 0;
@@ -53,7 +53,7 @@ int getNumFilesInDirectory(String directory) {
   String* file_list;
   Serial.printf("Listing directory: %s\r\n", directory.c_str());
 
-  File root = LittleFS.open(directory);
+  File root = LittleFS.open(directory, "r");
   if (!root) {
     Serial.println("- failed to open directory");
     return 0;
@@ -76,7 +76,7 @@ int getNumFilesInDirectory(String directory) {
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
   Serial.printf("Listing directory: %s\r\n", dirname);
 
-  File root = fs.open(dirname);
+  File root = fs.open(dirname, "r");
   if (!root) {
     Serial.println("- failed to open directory");
     return;
@@ -125,7 +125,7 @@ void removeDir(fs::FS &fs, const char * path) {
 void readFile(fs::FS &fs, const char * path) {
   Serial.printf("Reading file: %s\r\n", path);
 
-  File file = fs.open(path);
+  File file = fs.open(path, "r");
   if (!file || file.isDirectory()) {
     Serial.println("- failed to open file for reading");
     return;
@@ -164,7 +164,7 @@ void readFile(fs::FS &fs, const char * path) {
 void writeFile(fs::FS &fs, const char * path, const char * message) {
   Serial.printf("Writing file: %s\r\n", path);
 
-  File file = fs.open(path, FILE_WRITE);
+  File file = fs.open(path, "w");
   if (!file) {
     Serial.println("- failed to open file for writing");
     return;
@@ -180,7 +180,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message) {
 void appendFile(fs::FS &fs, const char * path, const char * message) {
   Serial.printf("Appending to file: %s\r\n", path);
 
-  File file = fs.open(path, FILE_APPEND);
+  File file = fs.open(path, "a");
   if (!file) {
     Serial.println("- failed to open file for appending");
     return;
@@ -232,7 +232,7 @@ void writeFile2(fs::FS &fs, const char * path, const char * message) {
   }
 
   Serial.printf("Writing file to: %s\r\n", path);
-  File file = fs.open(path, FILE_WRITE);
+  File file = fs.open(path, "w");
   if (!file) {
     Serial.println("- failed to open file for writing");
     return;
@@ -274,7 +274,7 @@ void testFileIO(fs::FS &fs, const char * path) {
 
   static uint8_t buf[512];
   size_t len = 0;
-  File file = fs.open(path, FILE_WRITE);
+  File file = fs.open(path, "w");
   if (!file) {
     Serial.println("- failed to open file for writing");
     return;
@@ -294,7 +294,7 @@ void testFileIO(fs::FS &fs, const char * path) {
   Serial.printf(" - %u bytes written in %u ms\r\n", 2048 * 512, end);
   file.close();
 
-  file = fs.open(path);
+  file = fs.open(path, "w");
   start = millis();
   end = start;
   i = 0;
@@ -325,7 +325,7 @@ void testFileIO(fs::FS &fs, const char * path) {
 
 void initFileSystem() {
 
-  if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
+  if (!LittleFS.begin()) {
     Serial.println("LittleFS Mount Failed");
     return;
   }
@@ -408,7 +408,7 @@ int checkForFile(String filename, String directory) {
       Serial.print(filepath);
       Serial.print(" : ");
       Serial.println(filestrs[i]);
-      if (strcmp(filestrs[i].c_str(), filepath.c_str())==0) {
+      if (strcmp(filestrs[i].c_str(), filepath.c_str()) == 0) {
         Serial.println("Match Found");
         return 1;
       }

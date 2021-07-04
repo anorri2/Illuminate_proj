@@ -6,7 +6,7 @@ extern void writeFile(fs::FS &fs, const char * path, const char * message);
 
 void GradientEffect::getDataFromFile(fs::FS &fs, String filename) {
 
-  File file = fs.open(filename.c_str());
+  File file = fs.open(filename.c_str(),"r");
   if (!file || file.isDirectory()) {
     Serial.println("- failed to open file for reading:" + filename);
   }
@@ -130,24 +130,24 @@ void GradientEffect::show(CRGB* leds, int duration, bool dir) {
   }
 }
 
-
+bool sfxEn=false;
 void GradientEffect::updateToPosition(CRGB* leds, uint8_t position) {
   for (int i = 0; i < _numLeds; i++) {
     if (!sfxEn) {
       leds[_ledSequence[i]] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
     }
-    else {
-      bool assigned = false;
-      int count_to = (_numLeds > sound_fx.numLeds) ? sound_fx.numLeds : _numLeds;
-      for (int q = 0; q < count_to; q++) {
-        if (_ledSequence[i] == sound_fx.ledSequence[q]) {
-          assigned = true;
-        }
-      }
-      if (!assigned) {
-        leds[_ledSequence[i]] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
-      }
-    }
+//    else {
+//      bool assigned = false;
+//      int count_to = (_numLeds > sound_fx.numLeds) ? sound_fx.numLeds : _numLeds;
+//      for (int q = 0; q < count_to; q++) {
+//        if (_ledSequence[i] == sound_fx.ledSequence[q]) {
+//          assigned = true;
+//        }
+//      }
+//      if (!assigned) {
+//        leds[_ledSequence[i]] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
+//      }
+//    }
   }
 }
 
@@ -196,6 +196,6 @@ String GradientEffect::formatToJSONString() {
 bool GradientEffect::saveToFile(String filename, String directory) {
   String str = formatToJSONString();
   String fname = directory + filename + ".json";
-  writeFile(LITTLEFS, fname.c_str(), str.c_str());
+  writeFile(LittleFS, fname.c_str(), str.c_str());
   return true;
 }

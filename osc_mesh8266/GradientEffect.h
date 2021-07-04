@@ -2,7 +2,11 @@
 #define GradientEffect_h
 
 #include <Arduino.h>
-#include <WiFi.h>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#else
+//#include <WiFi.h>
+#endif
 #include "ArduinoJson.h"
 #include "LittleFS.h"
 #include <FastLED.h>

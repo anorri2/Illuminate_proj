@@ -1,151 +1,11 @@
 #ifndef FIXTURE_H
 #define FIXTURE_H
 
+
 #define NODEMCU_DATA_PIN_4  D4
 #define NODEMCU_DATA_PIN_2  D2
 #define NODEMCU_DATA_PIN_12  D1
-#define ESP_32_DATA_PIN_0 27
-
-
-extern CRGB leds[];
-
-class Fixture {
-  public:
-    typedef enum fixture_type_t {FIXTURE_TYPE_WS2811, FIXTURE_TYPE_SINGLE} fixture_type_t;
-    virtual void update();
-    virtual void setPatternCallback(void (*callBack)(Fixture* fix), int pattern_num = 0);
-  protected:
-    int _num_patterns = 0;
-};
-
-#include <FastLED.h>
-
-class WS2811_Fixture : public Fixture {
-  private:
-    int _start_led = 0;
-    int _end_led = 0;
-    int _num_leds = 0;
-    int _data_pin = 0;
-    CRGB* _leds;
-
-
-  public:
-    WS2811_Fixture() {
-
-    }
-    void operator=(WS2811_Fixture input) { // compound assignment (does not need to be a member,
-      _start_led = input._start_led;
-      _num_leds = input._num_leds;
-      _end_led = input._end_led;
-      _data_pin = input._data_pin;
-      _leds = input._leds;
-      return;
-    }
-
-    WS2811_Fixture(int startled, int numleds, int datapin, CRGB* ledarr) {
-      _start_led = startled;
-      _num_leds = numleds;
-      _end_led = _start_led + _num_leds;
-      _data_pin = datapin;
-      _leds = ledarr;
-
-      Serial.printf("Attatching %d leds to pin %d \r\n", _num_leds, _data_pin);
-      switch (_data_pin) {
-        case  4: {
-            FastLED.addLeds<WS2812B, NODEMCU_DATA_PIN_4>(_leds, _num_leds);
-            break;
-          }
-        case  2: {
-            FastLED.addLeds<WS2812B, NODEMCU_DATA_PIN_2>(_leds, _num_leds);
-            break;
-          }
-        case  12: {
-            FastLED.addLeds<WS2812B, NODEMCU_DATA_PIN_12>(_leds, _num_leds);
-            break;
-          }
-        default : {
-            Serial.println("ERROR UNKNOWN PIN SELECTED");
-            while (1);
-          }
-      }
-    }
-
-    void (*pattern0)(Fixture* fix) = NULL;
-    void (*pattern1)(Fixture* fix) = NULL;
-    void (*pattern2)(Fixture* fix) = NULL;
-    void (*pattern3)(Fixture* fix) = NULL;
-    void (*pattern4)(Fixture* fix) = NULL;
-
-    void setPatternCallback(void (*callBack)(Fixture* fix), int pattern_num = 0) {
-      _num_patterns++;
-      switch (pattern_num) {
-        case 0: {
-            pattern0 = callBack;
-            break;
-          }
-        case 1: {
-            pattern1 = callBack;
-            break;
-          }
-        case 2: {
-            pattern2 = callBack;
-            break;
-          }
-        case 3: {
-            pattern3 = callBack;
-            break;
-          }
-        case 4: {
-            pattern4 = callBack;
-            break;
-          }
-        default: {
-            Serial.println("ERROR INVALID CALLBACK NUM");
-            while (1);
-          }
-      }
-    }
-
-    void update() { //virtual function from Fixture
-
-      if (pattern0 != NULL) {
-        pattern0(this);
-      }
-      if (pattern1 != NULL) {
-        pattern1(this);
-      }
-      if (pattern2 != NULL) {
-        pattern2(this);
-      }
-      if (pattern3 != NULL) {
-        pattern3(this);
-      }
-      if (pattern4 != NULL) {
-        pattern4(this);
-      }
-    }
-
-    int getNumLeds() {
-      return _num_leds;
-    }
-    int getStartLed() {
-      return _start_led;
-    }
-    int getEndLed() {
-      return _end_led;
-    }
-
-    CRGB* getLeds() {
-      return _leds;
-    }
-
-};
-
-
-//#define NODEMCU_DATA_PIN_4  D4
-//#define NODEMCU_DATA_PIN_2  D2
-//#define NODEMCU_DATA_PIN_12  D1
-#define ESP_32_DATA_PIN_27 27
+//#define ESP_32_DATA_PIN_27 27
 
 
 extern CRGB leds[];
@@ -229,8 +89,8 @@ class WS2811_Fixture : public Fixture {
 
       Serial.printf("Attatching %d leds to pin %d \r\n", _num_leds, _data_pin);
       switch (_data_pin) {
-        case  27: {
-            FastLED.addLeds<WS2812B, ESP_32_DATA_PIN_27>(_leds, _num_leds);
+        case  4: {
+            FastLED.addLeds<WS2812B, NODEMCU_DATA_PIN_4>(_leds, _num_leds);
             break;
           }
 
