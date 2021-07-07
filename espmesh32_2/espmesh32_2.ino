@@ -1,13 +1,34 @@
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#else
+#include <WiFi.h>
+#endif
 
 
+#include <WiFiUdp.h>
+#include <OSCMessage.h>
+#include <ArduinoOTA.h>
+#include "painlessMesh.h"
 #include <FastLED.h>
 #include "nodeConfigs.h"
-#include "painlessMesh.h"
-#include <ArduinoOTA.h>
-
+#include "Fixture.h"
+#include "EffectFileSystem.h"
 
 void initOTA();
+void checkForOSC();
+void sendOSC();
+void checkForSerialCommands();
 
+WiFiUDP Udp;                                // A UDP instance to let us send and receive packets over UDP
+const IPAddress outIp(10, 66, 41, 2);     // remote IP of your computer
+const unsigned int outPort = 7000;          // remote port to receive OSC
+const unsigned int localPort = 7001;        // local port to listen for OSC packets (actually not used for sending)
+
+OSCErrorCode error;
+
+void rec_routine(OSCMessage &msg) {
+  Serial.printf("Link1: %f\r\n", msg.getFloat(0));
+}
 
 //DELETE ME
 int otherNodeTouchVal = 0;
@@ -21,6 +42,34 @@ int NODE_REF = 0;
 bool hasUltrasonic = false;
 bool hasTouch = false;
 
+// Ultrasonic input
+const int trigPin = 32;
+const int echoPin = 35;
+unsigned int distanceMapped = 0;
+unsigned long echoMicros = 0;
+
+void IRAM_ATTR ultrasonicISR() {
+  if (digitalRead(echoPin)) {
+    echoMicros = micros();
+  }
+  else {
+    unsigned long echoTime = micros() - echoMicros;
+    double distance = echoTime * 0.034 / 2;
+    int dis_int = (int)distance;
+
+    //constrain
+    if (dis_int < 3) {
+      dis_int = 3;
+    }
+    else if (dis_int > 100) {
+      dis_int = 100;
+    }
+    //map
+    double fl = ((dis_int - 3) * 255) / 97;
+    dis_int = (int) fl;
+    distanceMapped = 255 - dis_int;
+  }
+}
 
 const byte maxNumNodes = 8;
 uint32_t node_ids[maxNumNodes] = {0xe24229, 0xf149f1, 0xe4e8bc, 0xe28477, 0x2d8f8f };
@@ -70,10 +119,7 @@ int touchLowerBound = 1000;
 int touchUpperBound = 0;
 byte touchValue;
 int ave = 0;
-// Ultrasonic input
-const int trigPin = 32;
-const int echoPin = 35;
-int distanceMapped = 0;
+
 
 
 
@@ -101,7 +147,7 @@ void sendData(void* params) {
     msg += ',';
     msg += (String)0;
     mesh.sendBroadcast( msg );
-    Serial.println("Sent message" + msg);
+    //  Serial.println("Sent message" + msg);
     count++;
     vTaskDelay(200 / portTICK_PERIOD_MS);
   }
@@ -149,10 +195,22 @@ void receivedCallback( uint32_t from, String &msg ) {
 
 void newConnectionCallback(uint32_t nodeId) {
   Serial.printf("New Connection, nodeId = %u\r\n", nodeId);
+  Serial.print ("Station IP=");
+  IPAddress ipadd = mesh.getStationIP();
+  Serial.println(ipadd);
+  Serial.print ("AP IP=");
+  IPAddress apadd = mesh.getAPIP();
+  Serial.println(apadd);
 }
 
 void changedConnectionCallback() {
   Serial.printf("Changed connections\r\n");
+  Serial.print ("Station IP=");
+  IPAddress ipadd = mesh.getStationIP();
+  Serial.println(ipadd);
+  Serial.print ("AP IP=");
+  IPAddress apadd = mesh.getAPIP();
+  Serial.println(apadd);
 }
 
 void nodeTimeAdjustedCallback(int32_t offset) {
@@ -220,13 +278,18 @@ void ledTest() {
 void ledTask(void* params) {
   while (1) {
     //ledTest();
+    nodeLoop(NODE_REF);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
 }
 
 void ultrasonicTask(void* params) {
   while (1) {
-    measureDistance();
+    // Sets the trigPin on HIGH state for 10 micro seconds
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    Serial.printf("Distance mapped = %d \r\n", distanceMapped);
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
@@ -268,12 +331,12 @@ void setup() {
   }
 
   //Set up PWM on High Power LED pins
-//  ledcSetup(hpRedChannel, freq, resolution);
-//  ledcSetup(hpGreenChannel, freq, resolution);
-//  ledcSetup(hpBlueChannel, freq, resolution);
-//  ledcAttachPin(hpRedPin, hpRedChannel);
-//  ledcAttachPin(hpGreenPin, hpGreenChannel);
-//  ledcAttachPin(hpBluePin, hpBlueChannel);
+  //  ledcSetup(hpRedChannel, freq, resolution);
+  //  ledcSetup(hpGreenChannel, freq, resolution);
+  //  ledcSetup(hpBlueChannel, freq, resolution);
+  //  ledcAttachPin(hpRedPin, hpRedChannel);
+  //  ledcAttachPin(hpGreenPin, hpGreenChannel);
+  //  ledcAttachPin(hpBluePin, hpBlueChannel);
 
   //Configure FastLED for Addressable LEDs
   //  int numl=random(4,10);
@@ -316,83 +379,90 @@ void setup() {
     "Ultrasonic Task",   // Name of the task (for debugging)
     5000,              // Stack size (bytes)
     NULL,             // Parameter to pass
-    0,               // Task priority
+    5,               // Task priority
     &h_ultrasonicTask , // Task handle
     0              //Run on core 1
   );
 
-  xTaskCreatePinnedToCore(
-    touchTask,        // Function that should be called
-    "Touch Task",   // Name of the task (for debugging)
-    5000,              // Stack size (bytes)
-    NULL,             // Parameter to pass
-    0,               // Task priority
-    &h_touchTask , // Task handle
-    0              //Run on core 1
-  );
+  //  xTaskCreatePinnedToCore(
+  //    touchTask,        // Function that should be called
+  //    "Touch Task",   // Name of the task (for debugging)
+  //    5000,              // Stack size (bytes)
+  //    NULL,             // Parameter to pass
+  //    0,               // Task priority
+  //    &h_touchTask , // Task handle
+  //    0              //Run on core 1
+  //  );
 
-  xTaskCreatePinnedToCore(
-    ledTask,        // Function that should be called
-    "LED Task",   // Name of the task (for debugging)
-    5000,              // Stack size (bytes)
-    NULL,             // Parameter to pass
-    0,               // Task priority
-    &h_ledTask , // Task handle
-    0              //Run on core 1
-  );
+    xTaskCreatePinnedToCore(
+      ledTask,        // Function that should be called
+      "LED Task",   // Name of the task (for debugging)
+      5000,              // Stack size (bytes)
+      NULL,             // Parameter to pass
+      0,               // Task priority
+      &h_ledTask , // Task handle
+      0              //Run on core 1
+    );
 
   touchUpperBound = touchRead(touchPin);
   touchLowerBound = touchUpperBound * 0.3;
 
   initOTA();
+
+  attachInterrupt(echoPin, ultrasonicISR, CHANGE);
+
+  initFileSystem();
+
+
 }
-
-float measureDistance() {
-  // Clears the trigPin
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  // Reads the echoPin, returns the sound wave travel time in microseconds
-  // float duration = millis()-startTime;
-  float duration = pulseIn(echoPin, HIGH);
-
-  // Calculating the distance
-  float distance = duration * 0.034 / 2;
-
-  // Prints the distance on the Serial Monitor
-  //Serial.print("Distance: ");
-  // Serial.println(distance);
-  int dis_int = (int)distance;
-  dis_int = constrain(dis_int, 3, 100);
-  dis_int = map(dis_int, 3, 100, 0, 255);
-  distanceMapped = 255 - dis_int;
-  //Serial.printf("distancemapped=%d\r\n", distanceMapped);
-  return distance;
-}
+//
+//float measureDistance() {
+//  // Clears the trigPin
+//
+//  // Reads the echoPin, returns the sound wave travel time in microseconds
+//  // float duration = millis()-startTime;
+//  float duration = pulseIn(echoPin, HIGH);
+//
+//  // Calculating the distance
+//  float distance = duration * 0.034 / 2;
+//
+//  // Prints the distance on the Serial Monitor
+//  //Serial.print("Distance: ");
+//  // Serial.println(distance);
+//  int dis_int = (int)distance;
+//  dis_int = constrain(dis_int, 3, 100);
+//  dis_int = map(dis_int, 3, 100, 0, 255);
+//  distanceMapped = 255 - dis_int;
+//  //Serial.printf("distancemapped=%d\r\n", distanceMapped);
+//  return distance;
+//}
 
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
-  Serial.print ("Station IP=");
-  IPAddress ipadd = mesh.getStationIP();
-  Serial.println(ipadd);
-  Serial.print ("AP IP=");
-  IPAddress apadd = mesh.getAPIP();
-  Serial.println(apadd);
+  //  Serial.print ("Station IP=");
+  //  IPAddress ipadd = mesh.getStationIP();
+  //  Serial.println(ipadd);
+  //  Serial.print ("AP IP=");
+  //  IPAddress apadd = mesh.getAPIP();
+  //  Serial.println(apadd);
   //  // ledTest();
   //  if (hasUltrasonic) {
   //    measureDistance();
   //  }
 
-  nodeLoop(NODE_REF);
-  vTaskDelay(50 / portTICK_PERIOD_MS);
+  checkForSerialCommands();
+  checkForOSC();
+  sendOSC();
+  
+  //  nodeLoop(NODE_REF);
+  vTaskDelay(500 / portTICK_PERIOD_MS);
   //Serial.printf("Touch value = %d", touchRead(touchPin));
 
+
+}
+
+void checkForSerialCommands() {
   if (Serial.available() > 0) {
     byte inbyte = Serial.read();
 
@@ -494,4 +564,38 @@ void initOTA() {
   });
   ArduinoOTA.begin();
   Serial.println("Ready");
+}
+
+void sendOSC() {
+  OSCMessage msg("/composition/dashboard/link1");
+  msg.add((float)distanceMapped / 255);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+
+}
+void checkForOSC() {
+  OSCMessage inmsg;
+
+  int size = Udp.parsePacket();
+
+  if (size > 0) {
+    while (size--) {
+      // Serial.print(Udp.read());
+      inmsg.fill(Udp.read());
+    }
+    if (!inmsg.hasError()) {
+      if (inmsg.dispatch("/composition/dashboard/link1", rec_routine)) {
+        //    Serial.println("MATCHED");
+      }
+      else {
+        //    Serial.println("NOT MATCHED");
+      }
+    } else {
+      error = inmsg.getError();
+      Serial.print("error: ");
+      Serial.println(error);
+    }
+  }
 }

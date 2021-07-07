@@ -5,10 +5,11 @@
 #define NODEMCU_DATA_PIN_4  D4
 #define NODEMCU_DATA_PIN_2  D2
 #define NODEMCU_DATA_PIN_12  D1
+#define NODEMCU_GPIO_4  
 //#define ESP_32_DATA_PIN_27 27
 
 
-extern CRGB leds[];
+//extern CRGB leds[];
 
 class Fixture {
   public:
@@ -89,10 +90,11 @@ class WS2811_Fixture : public Fixture {
 
       Serial.printf("Attatching %d leds to pin %d \r\n", _num_leds, _data_pin);
       switch (_data_pin) {
-        case  4: {
-            FastLED.addLeds<WS2812B, NODEMCU_DATA_PIN_4>(_leds, _num_leds);
+        case  4: { // For some reason this is D2 on NodeMCU but need to enter D4
+            FastLED.addLeds<WS2812B, D4>(_leds, _num_leds);
             break;
           }
+          
 
         default : {
             Serial.println("ERROR UNKNOWN PIN SELECTED");

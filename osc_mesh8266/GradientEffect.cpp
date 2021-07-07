@@ -6,11 +6,11 @@ extern void writeFile(fs::FS &fs, const char * path, const char * message);
 
 void GradientEffect::getDataFromFile(fs::FS &fs, String filename) {
 
-  File file = fs.open(filename.c_str(),"r");
+  File file = fs.open(filename.c_str(), "r");
   if (!file || file.isDirectory()) {
     Serial.println("- failed to open file for reading:" + filename);
   }
-  DynamicJsonDocument doc(2000);
+  DynamicJsonDocument doc(1000);
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
 
@@ -22,15 +22,16 @@ void GradientEffect::getDataFromFile(fs::FS &fs, String filename) {
     return;
   }
   JsonObject obj = doc.as<JsonObject>();
+  Serial.println("Loading Grad");
 
   uint8_t ref = obj["ref"];
   uint8_t num_leds = obj["numL"];
-  uint8_t* seq;
-  seq = new uint8_t[num_leds];
+  uint8_t seq[64];
+  //seq = new uint8_t[num_leds];
   uint8_t num_cols = doc["numC"];
-  uint8_t* grad_bytes;
-  grad_bytes = new uint8_t[num_cols * 4];
+  uint8_t grad_bytes[16 * 4];
   uint8_t spacing = doc["spac"];
+  bool gotData = false;
 
   JsonArray seq_arr = obj["seq"].as<JsonArray>();
   for (int i = 0; i < num_leds; i++) {
@@ -54,8 +55,9 @@ void GradientEffect::getDataFromFile(fs::FS &fs, String filename) {
   }
 
   _spacing = spacing;
-  delete[] grad_bytes;
-  delete[] seq;
+  Serial.printf("numl=%d numc=%d spac=%d\r\n", _numLeds, _num_colours, _spacing);
+  Serial.println("GRAD LOADED");
+  gotData=true;
 }
 void GradientEffect::getDataFromClient(WiFiClient client) {
 
@@ -95,7 +97,7 @@ void GradientEffect::getDataFromClient(WiFiClient client) {
     gradbytes[1 + (4 * i)] = red[i];
     gradbytes[2 + (4 * i)] = green[i];
     gradbytes[3 + (4 * i)] = blue[i];
-//    Serial.printf("\r\n%d,%d,%d,%d,\r\n", gradbytes[4 * i], gradbytes[1 + (4 * i)], gradbytes[2 + (4 * i)], gradbytes[3 + (4 * i)]);
+    //    Serial.printf("\r\n%d,%d,%d,%d,\r\n", gradbytes[4 * i], gradbytes[1 + (4 * i)], gradbytes[2 + (4 * i)], gradbytes[3 + (4 * i)]);
   }
 
   for (int i = 0; i < 4 * _num_colours; i++) {
@@ -103,6 +105,7 @@ void GradientEffect::getDataFromClient(WiFiClient client) {
   }
   pal.loadDynamicGradientPalette(gradbytes);
   Serial.println("Gradient received from client");
+  gotData=true;
 }
 
 
@@ -130,24 +133,12 @@ void GradientEffect::show(CRGB* leds, int duration, bool dir) {
   }
 }
 
-bool sfxEn=false;
+bool sfxEn = false;
 void GradientEffect::updateToPosition(CRGB* leds, uint8_t position) {
   for (int i = 0; i < _numLeds; i++) {
     if (!sfxEn) {
-      leds[_ledSequence[i]] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
+      leds[i] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
     }
-//    else {
-//      bool assigned = false;
-//      int count_to = (_numLeds > sound_fx.numLeds) ? sound_fx.numLeds : _numLeds;
-//      for (int q = 0; q < count_to; q++) {
-//        if (_ledSequence[i] == sound_fx.ledSequence[q]) {
-//          assigned = true;
-//        }
-//      }
-//      if (!assigned) {
-//        leds[_ledSequence[i]] = ColorFromPalette(pal, ((_spacing * i) + position) % 256, 255, LINEARBLEND);
-//      }
-//    }
   }
 }
 

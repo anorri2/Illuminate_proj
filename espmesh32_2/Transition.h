@@ -2,7 +2,8 @@
 #define TRANSITION_H
 
 #include <FastLED.h>
-#include <LedRemapper.h>
+//#include <LedRemapper.h>
+
 class Transition {
 
 
@@ -10,7 +11,7 @@ class Transition {
   private:
     CRGB _input_array[20];
     CRGB _output_array[20];
-    LedRemapper remapper;
+   // LedRemapper remapper;
 
   public:
     Transition(CRGB input[20], CRGB output[20]) {
@@ -26,9 +27,9 @@ class Transition {
         int red_dif =  _output_array[i].red - _input_array[i].red;
         int green_dif =_output_array[i].green - _input_array[i].green ;
         int blue_dif = _output_array[i].blue - _input_array[i].blue;
-        leds[remapper.remapped[i]].red = _input_array[i].red + ((red_dif * pos) / 255);
-        leds[remapper.remapped[i]].green = _input_array[i].green + ((green_dif * pos) / 255);
-        leds[remapper.remapped[i]].blue = _input_array[i].blue + ((blue_dif * pos) / 255);
+//        leds[remapper.remapped[i]].red = _input_array[i].red + ((red_dif * pos) / 255);
+//        leds[remapper.remapped[i]].green = _input_array[i].green + ((green_dif * pos) / 255);
+//        leds[remapper.remapped[i]].blue = _input_array[i].blue + ((blue_dif * pos) / 255);
       }
 
     }

@@ -14,6 +14,11 @@
 #include "Fixture.h"
 #include "EffectFileSystem.h"
 
+void checkForSerialCommands();
+void checkForOSC();
+void sendOSC();
+
+
 //char ssid[] = "Psynet";          // your network SSID (name)
 //char pass[] = "serenity@shangrila";                    // your network password
 
@@ -29,13 +34,13 @@ OSCErrorCode error;
 int otherNodeTouchVal = 0;
 //
 
+
+//Mesh attributes
 #define   MESH_PREFIX     "Eywa"
 #define   MESH_PASSWORD   "avitarrr"
 #define   MESH_PORT       5555
 
 int NODE_REF = 1;
-bool hasUltrasonic = false;
-bool hasTouch = false;
 
 float measureDistance();
 
@@ -48,44 +53,28 @@ typedef struct {
   String nodeName;
   uint8_t sensorVal[3];
 } NODE_INFO;
-
 NODE_INFO nodes[maxNumNodes];
-
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
 
 
+bool hasUltrasonic = false;
+bool hasTouch = false;
+
+
+
 //Addressable LED variables
 const int numLeds = 20; // CHANGE FOR YOUR SETUP
 const byte dataPin = 27;
-CRGB leds[numLeds];
+//CRGB leds[numLeds];
 
 
-
-//High power LED variables
-const int freq = 5000;
-const int resolution = 8;
-
-const int hpRedChannel = 0;
-const int hpGreenChannel = 1;
-const int hpBlueChannel = 2;
-
-const int hpRedPin = 21;
-const int hpGreenPin = 22;
-const int hpBluePin = 23;
 
 //Button input
 const int buttonPin = 34;
 
-//Touch Input
-const int touchPin = 15;
-int touchReadings[10];
-int touchCheckCounter = 0;
-int touchLowerBound = 1000;
-int touchUpperBound = 0;
-byte touchValue;
-int ave = 0;
+
 // Ultrasonic input
 const int trigPin = 32;
 const int echoPin = 35;
@@ -103,9 +92,9 @@ int count = 0;
 
 void sendData() {
   String msg = "SINF:";
-  msg += (String)distanceMapped;
+  msg += (String)255;
   msg += ',';
-  msg += (String)touchValue;
+  msg += (String)255;
   msg += ',';
   msg += (String)0;
   mesh.sendBroadcast( msg );
@@ -242,15 +231,12 @@ void setup() {
     Serial.printf("\r\n Unknown Chip ID:%x unable to proceed \r\n", thisID);
     while (1);
   }
-  //Serial.printf("\r\n Chip ID:%x %x \r\n", ESP.getChipId(), thisID);
 
-  //  //Set up PWM on High Power LED pins
-  //  ledcSetup(hpRedChannel, freq, resolution);
-  //  ledcSetup(hpGreenChannel, freq, resolution);
-  //  ledcSetup(hpBlueChannel, freq, resolution);
-  //  ledcAttachPin(hpRedPin, hpRedChannel);
-  //  ledcAttachPin(hpGreenPin, hpGreenChannel);
-  //  ledcAttachPin(hpBluePin, hpBlueChannel);
+  initFileSystem();
+  String files[10];
+
+  getFilesInDirectory(files, "/");
+  //Serial.printf("\r\n Chip ID:%x %x \r\n", ESP.getChipId(), thisID);
 
 
   //Configure FastLED for Addressable LEDs
@@ -327,63 +313,53 @@ void rec_routine(OSCMessage &msg) {
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
-  Serial.println(WiFi.localIP());
+  // Serial.println(WiFi.localIP());
   //  // ledTest();
-  if (hasUltrasonic) {
-    measureDistance();
-  }
+  //  if (hasUltrasonic) {
+  //    measureDistance();
+  //  }
+
+
   nodeLoop(NODE_REF);
-
-
-  if (Serial.available() > 0) {
-    byte inbyte = Serial.read();
-
-    switch (inbyte) {
-      case 'o': {
-          unsigned long  time_elapsed = millis();
-          while (millis() - time_elapsed < 300000) {
-            ArduinoOTA.handle();
-            delay(10);
-          }
-          break;
-        }
-    }
-  }
-
-  if (NODE_REF == 1) {
-
-    OSCMessage inmsg;
-
-    int size = Udp.parsePacket();
-
-    if (size > 0) {
-      while (size--) {
-        // Serial.print(Udp.read());
-        inmsg.fill(Udp.read());
-      }
-      if (!inmsg.hasError()) {
-        if (inmsg.dispatch("/composition/dashboard/link1", rec_routine)) {
-          //    Serial.println("MATCHED");
-        }
-        else {
-          //    Serial.println("NOT MATCHED");
-        }
-      } else {
-        error = inmsg.getError();
-        Serial.print("error: ");
-        Serial.println(error);
-      }
-    }
-    OSCMessage msg("/composition/dashboard/link1");
-    msg.add((float)touchValue / 255);
-    Udp.beginPacket(outIp, outPort);
-    msg.send(Udp);
-    Udp.endPacket();
-    msg.empty();
-    //  delay(500);
-  }
+  checkForSerialCommands();
+  //checkForOSC();
+  //sendOSC();
+  delay(500);
 }
 
+void sendOSC() {
+  OSCMessage msg("/composition/dashboard/link1");
+  msg.add((float)255 / 255);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+
+}
+void checkForOSC() {
+  OSCMessage inmsg;
+
+  int size = Udp.parsePacket();
+
+  if (size > 0) {
+    while (size--) {
+      // Serial.print(Udp.read());
+      inmsg.fill(Udp.read());
+    }
+    if (!inmsg.hasError()) {
+      if (inmsg.dispatch("/composition/dashboard/link1", rec_routine)) {
+        //    Serial.println("MATCHED");
+      }
+      else {
+        //    Serial.println("NOT MATCHED");
+      }
+    } else {
+      error = inmsg.getError();
+      Serial.print("error: ");
+      Serial.println(error);
+    }
+  }
+}
 
 void initOTA() {
   ArduinoOTA.setPassword("777");
@@ -425,4 +401,21 @@ void initOTA() {
   });
   ArduinoOTA.begin();
   Serial.println("Ready");
+}
+
+void checkForSerialCommands() {
+  if (Serial.available() > 0) {
+    byte inbyte = Serial.read();
+
+    switch (inbyte) {
+      case 'o': {
+          unsigned long  time_elapsed = millis();
+          while (millis() - time_elapsed < 300000) {
+            ArduinoOTA.handle();
+            delay(10);
+          }
+          break;
+        }
+    }
+  }
 }

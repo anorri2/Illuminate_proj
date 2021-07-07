@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 //#include "FS.h"
-#include "LittleFS.h"
+#include "LITTLEFS.h"
 
 /* You only need to format LITTLEFS the first time you run a
    test or else use the LITTLEFS plugin to create a partition
@@ -16,7 +16,7 @@ int getFilesInDirectory(String* file_array, String directory) {
   //String* file_list;
   Serial.printf("Listing directory: %s\r\n", directory.c_str());
 
-  File root = LittleFS.open(directory.c_str(), "r");
+  File root = LITTLEFS.open(directory.c_str(), "r");
   if (!root) {
     Serial.println("- failed to open directory");
     return 0;
@@ -53,7 +53,7 @@ int getNumFilesInDirectory(String directory) {
   String* file_list;
   Serial.printf("Listing directory: %s\r\n", directory.c_str());
 
-  File root = LittleFS.open(directory, "r");
+  File root = LITTLEFS.open(directory, "r");
   if (!root) {
     Serial.println("- failed to open directory");
     return 0;
@@ -211,7 +211,7 @@ void deleteFile(fs::FS &fs, const char * path) {
   }
 }
 
-// eq_spiFFS-like write and delete file, better use #define CONFIG_LittleFS_eq_spiFFS_COMPAT 1
+// eq_spiFFS-like write and delete file, better use #define CONFIG_LITTLEFS_eq_spiFFS_COMPAT 1
 
 void writeFile2(fs::FS &fs, const char * path, const char * message) {
   if (!fs.exists(path)) {
@@ -325,8 +325,8 @@ void testFileIO(fs::FS &fs, const char * path) {
 
 void initFileSystem() {
 
-  if (!LittleFS.begin()) {
-    Serial.println("LittleFS Mount Failed");
+  if (!LITTLEFS.begin()) {
+    Serial.println("LITTLEFS Mount Failed");
     return;
   }
   //    Serial.println( "eq_spiFFS-like write file to new path and delete it w/folders" );
@@ -366,29 +366,29 @@ void manageFileSystem() {
 
     switch (comm) {
       case 'm': {
-          createDir(LittleFS, name.c_str());
+          createDir(LITTLEFS, name.c_str());
           break;
         }
       case 'w': {
           Serial.println("Enter text to write");
           while (!Serial.available());
           String input = Serial.readString();
-          writeFile(LittleFS, name.c_str(), input.c_str());
+          writeFile(LITTLEFS, name.c_str(), input.c_str());
           break;
         }
       case 'l': {
           Serial.println("Enter num levels");
           while (!Serial.available());
           int i = Serial.parseInt();
-          listDir(LittleFS, name.c_str(), i);
+          listDir(LITTLEFS, name.c_str(), i);
           break;
         }
       case 'd': {
-          deleteFile(LittleFS, name.c_str());
+          deleteFile(LITTLEFS, name.c_str());
           break;
         }
       case 'r': {
-          readFile(LittleFS, name.c_str());
+          readFile(LITTLEFS, name.c_str());
           break;
         }
     }

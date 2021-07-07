@@ -10,9 +10,6 @@
 #include "ArduinoJson.h"
 #include "LittleFS.h"
 #include <FastLED.h>
-//#include "SharedData.h"
-//#include "main.h"
-//#include "EffectFileSystem.h"
 
 
 
@@ -20,27 +17,30 @@ class GradientEffect {
 
   private:
     uint8_t _numLeds=0;
-    byte _ledSequence[20];
+    byte _ledSequence[64];
     uint8_t _num_colours=0;
     CRGBPalette16 pal;
     int _spacing=0;
     byte _duration = 10;
     byte _gradbytes[16 * 4];
+ //   bool gotData = false;
 
 
   public:
     enum {FORWARD, BACKWARD};
-
+    bool gotData = false;
 
     GradientEffect() {
     }
 
     GradientEffect(WiFiClient client) {    // Build a gradient from client data
       getDataFromClient(client);
+      gotData=true;
     }
 
     GradientEffect(String filename) {    // Build a gradient from client data
       getDataFromFile(LittleFS, filename);
+      gotData=true;
     }
 
     GradientEffect(uint8_t num_leds, byte sequence[20], int numofcolours, byte* gradbytes, int spacing) { //Build a gradient from a byte array
@@ -54,6 +54,7 @@ class GradientEffect {
         _gradbytes[i] = gradbytes[i];
       }
       pal.loadDynamicGradientPalette(gradbytes);
+      gotData=true;
     }
 
     void getArrayAtPosition(CRGB* arr, int pos) {

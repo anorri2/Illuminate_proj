@@ -13,8 +13,6 @@ class Fixture {
   public:
     typedef enum fixture_type_t {FIXTURE_TYPE_WS2811, FIXTURE_TYPE_SINGLE} fixture_type_t;
     virtual void update();
-    //    virtual void setPatternCallback(void (*callBack)(Fixture* fix), int pattern_num = 0);
-
 
     void (*pattern0)(Fixture* fix) = NULL;
     void (*pattern1)(Fixture* fix) = NULL;
@@ -137,11 +135,6 @@ class WS2811_Fixture : public Fixture {
 
 class Single_Fixture : public Fixture {
   private:
-    int _start_led = 0;
-    int _end_led = 0;
-    int _num_leds = 0;
-    int _data_pin = 0;
-    CRGB* _leds;
     int _r_pin;
     int _g_pin;
     int _b_pin;
