@@ -14,20 +14,39 @@
 #include "Fixture.h"
 #include "EffectFileSystem.h"
 
+#define STA_SSID "Psynet"
+#define STA_PASS "serenity@shangrila"
+#define HOST_NAME "my host"
+
 void initOTA();
 void checkForOSC();
 void sendOSC();
 void checkForSerialCommands();
 
+
+Scheduler userScheduler; // to control your personal task
+painlessMesh  mesh;
+
 WiFiUDP Udp;                                // A UDP instance to let us send and receive packets over UDP
-const IPAddress outIp(10, 66, 41, 2);     // remote IP of your computer
+//const IPAddress outIp(10, 66, 41, 2);     // remote IP of your computer
+//const IPAddress outIp(10, 66, 41, 2);     // remote IP of your computer
+const IPAddress outIp(192, 168, 1, 119);    // remote IP of your computer
+//const IPAddress outIp(169,254, 179, 175);     // remote IP of your computer
 const unsigned int outPort = 7000;          // remote port to receive OSC
 const unsigned int localPort = 7001;        // local port to listen for OSC packets (actually not used for sending)
 
 OSCErrorCode error;
 
 void rec_routine(OSCMessage &msg) {
-  Serial.printf("Link1: %f\r\n", msg.getFloat(0));
+  char addr[128];
+  msg.getAddress(addr);
+  String str=addr;
+  if(str.indexOf("link1")>=0){
+    Serial.printf("Link1: %f\r\n", msg.getFloat(0));
+  }
+  else{
+    Serial.printf("%s %f\r\n", addr,msg.getFloat(0));
+  }
 }
 
 //DELETE ME
@@ -85,8 +104,6 @@ typedef struct {
 NODE_INFO nodes[maxNumNodes];
 
 
-Scheduler userScheduler; // to control your personal task
-painlessMesh  mesh;
 
 
 //Addressable LED variables
@@ -348,17 +365,51 @@ void setup() {
   pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
   pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 
-  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
 
-  mesh.init( MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT );
+
+  /*
+
+    mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION );  // set before init() so that you can see startup messages
+
+    // Channel set to 1. Make sure to use the same channel for your mesh and for you other
+    // network (STATION_SSID)
+    mesh.init( MESH_PREFIX, MESH_PASSWORD, MESH_PORT, WIFI_AP_STA );
+    mesh.onReceive(&receivedCallback);
+    mesh.onNewConnection(&newConnectionCallback);
+    mesh.onChangedConnections(&changedConnectionCallback);
+    mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
+
+    mesh.stationManual(STATION_SSID, STATION_PASSWORD);
+    mesh.setHostname(HOSTNAME);
+
+    // Bridge node, should (in most cases) be a root node. See [the wiki](https://gitlab.com/painlessMesh/painlessMesh/wikis/Possible-challenges-in-mesh-formation) for some background
+    mesh.setRoot(true);
+    // This node and all other nodes should ideally know the mesh contains a root, so call this on all nodes
+    mesh.setContainsRoot(true);
+
+  */
+  mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
+  //mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+
+  // mesh.init( MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT,WIFI_AP_STA );
+  mesh.init( MESH_PREFIX, MESH_PASSWORD, MESH_PORT, WIFI_AP_STA, 4, 9 );
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 
-  userScheduler.addTask( taskSendMessage );
-  taskSendMessage.enable();
+  mesh.stationManual(STA_SSID, STA_PASS);
+  // mesh.setHostname(HOST_NAME);
+
+  // Bridge node, should (in most cases) be a root node. See [the wiki](https://gitlab.com/painlessMesh/painlessMesh/wikis/Possible-challenges-in-mesh-formation) for some background
+  // mesh.setRoot(true);
+  // This node and all other nodes should ideally know the mesh contains a root, so call this on all nodes
+  // mesh.setContainsRoot(true);
+
+
+
+  //userScheduler.addTask( taskSendMessage );
+  //taskSendMessage.enable();
   initNodes();
   configNode(NODE_REF);
 
@@ -394,15 +445,15 @@ void setup() {
   //    0              //Run on core 1
   //  );
 
-    xTaskCreatePinnedToCore(
-      ledTask,        // Function that should be called
-      "LED Task",   // Name of the task (for debugging)
-      5000,              // Stack size (bytes)
-      NULL,             // Parameter to pass
-      0,               // Task priority
-      &h_ledTask , // Task handle
-      0              //Run on core 1
-    );
+  xTaskCreatePinnedToCore(
+    ledTask,        // Function that should be called
+    "LED Task",   // Name of the task (for debugging)
+    5000,              // Stack size (bytes)
+    NULL,             // Parameter to pass
+    0,               // Task priority
+    &h_ledTask , // Task handle
+    0              //Run on core 1
+  );
 
   touchUpperBound = touchRead(touchPin);
   touchLowerBound = touchUpperBound * 0.3;
@@ -412,6 +463,17 @@ void setup() {
   attachInterrupt(echoPin, ultrasonicISR, CHANGE);
 
   initFileSystem();
+
+  Serial.println("Starting UDP");
+  Udp.begin(localPort);
+  Serial.print("Local port: ");
+#ifdef ESP32
+  Serial.println(localPort);
+#else
+  Serial.println(Udp.localPort());
+#endif
+
+
 
 
 }
@@ -452,9 +514,10 @@ void loop() {
   //  }
 
   checkForSerialCommands();
+  Serial.println(WiFi.localIP());
   checkForOSC();
   sendOSC();
-  
+
   //  nodeLoop(NODE_REF);
   vTaskDelay(500 / portTICK_PERIOD_MS);
   //Serial.printf("Touch value = %d", touchRead(touchPin));
@@ -587,10 +650,13 @@ void checkForOSC() {
     }
     if (!inmsg.hasError()) {
       if (inmsg.dispatch("/composition/dashboard/link1", rec_routine)) {
-        //    Serial.println("MATCHED");
+        //Serial.println("MATCHED");
+      }
+      if (inmsg.dispatch("/composition/dashboard/link2", rec_routine)) {
+        //Serial.println("MATCHED");
       }
       else {
-        //    Serial.println("NOT MATCHED");
+        // Serial.println("NOT MATCHED");
       }
     } else {
       error = inmsg.getError();
